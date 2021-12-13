@@ -19,6 +19,7 @@
 #include "lorawan/LoRaWANInterface.h"
 #include "lorawan/system/lorawan_data_structures.h"
 #include "events/EventQueue.h"
+#include "./MBed_Adafruit_GPS.h"
 
 // Application helpers
 #include "DummySensor.h"
@@ -92,8 +93,38 @@ static uint8_t APP_KEY[] = { 0xf3,0x1c,0x2e,0x8b,0xc6,0x71,0x28,0x1d,0x51,0x16,0
 /**
  * Entry point for application
  */
+
+BufferedSerial* gps_Serial = new BufferedSerial(PA_9, PA_10,9600); 
+Thread gps_thread(osPriorityNormal, 2048);
+Adafruit_GPS myGPS(gps_Serial); 
+float latitude, longitude;
+Mutex mutex;
+
+void readGps() {
+	char c; //when read via Adafruit_GPS::read(), the class returns single character stored here
+	//Timer refresh_Timer; //sets up a timer for use in loop; how often do we print GPS info?
+	//const int refresh_Time = 2000; //refresh time in ms
+	while(true) {
+			//refresh_Timer.start(); 
+			c = myGPS.read();   //queries the GPS
+			//if (c) { printf("%c", c); } //this line will echo the GPS data if not paused
+			//check if we recieved a new message from GPS, if so, attempt to parse it,
+			if ( myGPS.newNMEAreceived() ) {
+				if (!myGPS.parse(myGPS.lastNMEA())) {
+					continue;
+				}
+			}
+			
+			mutex.lock();
+			latitude = myGPS.latitude;
+			longitude = myGPS.longitude;
+			mutex.unlock();
+		}
+}
+
 int main(void)
 {
+		gps_thread.start(readGps);
     // setup tracing
     setup_trace();
 
@@ -163,17 +194,17 @@ static void send_message()
     int32_t sensor_value;
 
     if (ds1820.begin()) {
-        ds1820.startConversion();
-        sensor_value = ds1820.read();
         printf("\r\n Dummy Sensor Value = %d \r\n", sensor_value);
         ds1820.startConversion();
     } else {
         printf("\r\n No sensor found \r\n");
         return;
     }
-
-    packet_len = sprintf((char *) tx_buffer, "%d",
-                         sensor_value);
+		
+		int integerLatitude = (int)latitude;
+		float decimalLatitude = (latitude - integerLatitude) * 10;
+    packet_len = sprintf((char *) tx_buffer, "%03d%01d",
+                         integerLatitude, abs((int)decimalLatitude));
 
     retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packet_len,
                            MSG_UNCONFIRMED_FLAG);
