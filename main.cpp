@@ -97,7 +97,7 @@ static uint8_t APP_KEY[] = { 0xf3,0x1c,0x2e,0x8b,0xc6,0x71,0x28,0x1d,0x51,0x16,0
 BufferedSerial* gps_Serial = new BufferedSerial(PA_9, PA_10,9600); 
 Thread gps_thread(osPriorityNormal, 2048);
 Adafruit_GPS myGPS(gps_Serial); 
-float latitude, longitude;
+float latitude, longitude, lat, lon;
 Mutex mutex;
 
 void readGps() {
@@ -116,8 +116,14 @@ void readGps() {
 			}
 			
 			mutex.lock();
-			latitude = myGPS.latitude;
-			longitude = myGPS.longitude;
+			latitude = myGPS.latitude / 100.0;
+			longitude = myGPS.longitude / 100.0;
+			if (myGPS.lat == 'S') {
+				latitude = -latitude;
+			} 
+			if (myGPS.lon == 'W') {
+				longitude = -longitude;
+			}
 			mutex.unlock();
 		}
 }
@@ -200,11 +206,15 @@ static void send_message()
         printf("\r\n No sensor found \r\n");
         return;
     }
-		
+		printf(" LOCATION: %5.2f, %5.2f\n", latitude, longitude);
 		int integerLatitude = (int)latitude;
 		float decimalLatitude = (latitude - integerLatitude) * 10;
-    packet_len = sprintf((char *) tx_buffer, "%03d%01d",
-                         integerLatitude, abs((int)decimalLatitude));
+		int integerLongitude = (int)longitude;
+		float decimalLongitude = (longitude - integerLongitude) * 10;
+		printf(" LOCATION: %5.2f %c, %5.2f %c", latitude, lat, longitude, lon);
+		printf("%03d%02d%03d%02d", integerLatitude, abs((int)decimalLatitude), integerLongitude, abs((int)decimalLongitude));
+    packet_len = sprintf((char *) tx_buffer, "%03d%02d%03d%02d",
+                         integerLatitude, abs((int)decimalLatitude), integerLongitude, abs((int)decimalLongitude));
 
     retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packet_len,
                            MSG_UNCONFIRMED_FLAG);
