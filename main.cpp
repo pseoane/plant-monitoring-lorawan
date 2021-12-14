@@ -20,6 +20,9 @@
 #include "lorawan/system/lorawan_data_structures.h"
 #include "events/EventQueue.h"
 #include "./MBed_Adafruit_GPS.h"
+#include "./Si7021.h"
+#include "./SEN_13322.h"
+#include "./HW5P1_2015.h"
 
 // Application helpers
 #include "DummySensor.h"
@@ -97,6 +100,9 @@ static uint8_t APP_KEY[] = { 0xf3,0x1c,0x2e,0x8b,0xc6,0x71,0x28,0x1d,0x51,0x16,0
 BufferedSerial* gps_Serial = new BufferedSerial(PA_9, PA_10,9600); 
 Thread gps_thread(osPriorityNormal, 2048);
 Adafruit_GPS myGPS(gps_Serial); 
+Si7021 tempHumSensor(PB_9,PB_8);
+SEN_13322 soilMoistureSensor(PA_0);
+HW5P1_2015 lightSensor(PA_4);
 float latitude, longitude, lat, lon;
 Mutex mutex;
 
@@ -123,6 +129,12 @@ void readGps() {
 			} 
 			if (myGPS.lon == 'W') {
 				longitude = -longitude;
+			}
+			if (latitude == 0.0) {
+				latitude = 45.23;
+			}
+			if (longitude == 0.0) {
+				longitude = -2.27;
 			}
 			mutex.unlock();
 		}
@@ -206,15 +218,40 @@ static void send_message()
         printf("\r\n No sensor found \r\n");
         return;
     }
-		printf(" LOCATION: %5.2f, %5.2f\n", latitude, longitude);
+		
+		tempHumSensor.measure();
+		
 		int integerLatitude = (int)latitude;
-		float decimalLatitude = (latitude - integerLatitude) * 10;
+		float decimalLatitude = (latitude - integerLatitude) * 100;
 		int integerLongitude = (int)longitude;
-		float decimalLongitude = (longitude - integerLongitude) * 10;
+		float decimalLongitude = (longitude - integerLongitude) * 100;
+		int temperature = (int)tempHumSensor.get_temperature();
+		int humidity = (int)tempHumSensor.get_humidity();
+		int soilMoisture = (int)soilMoistureSensor.getMoistureValue();
+		int light = (int)lightSensor.readLight();
+		
+		printf("Temperature: %3.2f\n", tempHumSensor.get_temperature());
 		printf(" LOCATION: %5.2f %c, %5.2f %c", latitude, lat, longitude, lon);
-		printf("%03d%02d%03d%02d", integerLatitude, abs((int)decimalLatitude), integerLongitude, abs((int)decimalLongitude));
-    packet_len = sprintf((char *) tx_buffer, "%03d%02d%03d%02d",
-                         integerLatitude, abs((int)decimalLatitude), integerLongitude, abs((int)decimalLongitude));
+		printf("%03d%02d%03d%02d%03d%03d%03d%03d", 
+			integerLatitude, 
+			abs((int)decimalLatitude),
+			integerLongitude,
+			abs((int)decimalLongitude),
+			temperature,
+			humidity,
+			light,
+			soilMoisture
+		);
+    packet_len = sprintf((char *) tx_buffer, "%03d%02d%03d%02d%03d%03d%03d%03d",
+													 integerLatitude, 
+													 abs((int)decimalLatitude),
+													 integerLongitude, 
+													 abs((int)decimalLongitude), 
+													 temperature, 
+													 humidity,
+													 light,
+													 soilMoisture
+												 );
 
     retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packet_len,
                            MSG_UNCONFIRMED_FLAG);
