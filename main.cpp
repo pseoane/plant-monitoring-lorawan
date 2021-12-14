@@ -23,6 +23,7 @@
 #include "./Si7021.h"
 #include "./SEN_13322.h"
 #include "./HW5P1_2015.h"
+#include "./RGBLED.h"
 
 // Application helpers
 #include "DummySensor.h"
@@ -104,6 +105,7 @@ Si7021 tempHumSensor(PB_9,PB_8);
 SEN_13322 soilMoistureSensor(PA_0);
 HW5P1_2015 lightSensor(PA_4);
 float latitude, longitude, lat, lon;
+RGBLED rgbLed(PH_0, PB_13, PH_1);
 Mutex mutex;
 
 void readGps() {
@@ -294,7 +296,7 @@ static void receive_message()
         printf("%02x ", rx_buffer[i]);
     }
     printf("\r\n");
-    
+    rgbLed.setColor((char*)rx_buffer);
     memset(rx_buffer, 0, sizeof(rx_buffer));
 }
 

@@ -9,29 +9,19 @@ void RGBLED::setColor(uint8_t red, uint8_t green, uint8_t blue) {
 	bluePin = blue;
 }
 
-void RGBLED::setColor(int color) {
-	switch(color){
-		case 0: 
-			setColor(1,0,0);
-      break;
-		case 1: 
-			setColor(0,1,0);
-      break;
-		case 2: 
-			setColor(0,0,1);
-      break;
-		case 3: 
-			setColor(1,1,0);
-      break;
-		case 4: 
-			setColor(1,0,1);
-      break;
-		case 5: 
-			setColor(1,1,1);
-      break;
-		case 6:
-			setColor(0,0,0);
-	default : break;
+void RGBLED::setColor(char * colorName) {
+	if (strcmp(colorName, "GREEN") == 0) {
+		RGBLED::setColor(0, 1, 0);
+		printf("Led set to green\n");
+	} else if (strcmp(colorName, "BLUE") == 0) {
+		RGBLED::setColor(0, 0, 1);
+		printf("Led set to blue\n");
+	} else if (strcmp(colorName, "RED") == 0) {
+		RGBLED::setColor(1, 0, 0);
+		printf("Led set to red\n");
+	} else if (strcmp(colorName, "OFF") == 0) {
+		RGBLED::setColor(0, 0, 0);
+		printf("Led set to off\n");
+	}
 }
 
-}
