@@ -133,10 +133,10 @@ void readGps() {
 				longitude = -longitude;
 			}
 			if (latitude == 0.0) {
-				latitude = 45.23;
+				latitude = 45.23234;
 			}
 			if (longitude == 0.0) {
-				longitude = -2.27;
+				longitude = -2.27098;
 			}
 			mutex.unlock();
 		}
@@ -211,54 +211,34 @@ static void send_message()
 {
     uint16_t packet_len;
     int16_t retcode;
-    int32_t sensor_value;
-
-    if (ds1820.begin()) {
-        printf("\r\n Dummy Sensor Value = %d \r\n", sensor_value);
-        ds1820.startConversion();
-    } else {
-        printf("\r\n No sensor found \r\n");
-        return;
-    }
 		
 		tempHumSensor.measure();
-		
-		int integerLatitude = (int)latitude;
-		float decimalLatitude = (latitude - integerLatitude) * 100;
-		int integerLongitude = (int)longitude;
-		float decimalLongitude = (longitude - integerLongitude) * 100;
-		int temperature = (int)tempHumSensor.get_temperature();
-		int humidity = (int)tempHumSensor.get_humidity();
-		int soilMoisture = (int)soilMoistureSensor.getMoistureValue();
-		int light = (int)lightSensor.readLight();
-		
-		printf("Temperature: %3.2f\n", tempHumSensor.get_temperature());
-		printf(" LOCATION: %5.2f %c, %5.2f %c", latitude, lat, longitude, lon);
-		printf("%03d%02d%03d%02d%03d%03d%03d%03d", 
-			integerLatitude, 
-			abs((int)decimalLatitude),
-			integerLongitude,
-			abs((int)decimalLongitude),
-			temperature,
-			humidity,
-			light,
-			soilMoisture
-		);
-    packet_len = sprintf((char *) tx_buffer, "%03d%02d%03d%02d%03d%03d%03d%03d",
-													 integerLatitude, 
-													 abs((int)decimalLatitude),
-													 integerLongitude, 
-													 abs((int)decimalLongitude), 
-													 temperature, 
-													 humidity,
-													 light,
-													 soilMoisture
-												 );
 
-    retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packet_len,
+		uint16_t temperature = (uint16_t)tempHumSensor.get_temperature();
+		uint16_t humidity = (uint16_t)tempHumSensor.get_humidity();
+	  uint16_t light = (uint16_t)lightSensor.readLight();
+		uint16_t soilMoisture = (uint16_t)soilMoistureSensor.getMoistureValue();
+		
+		printf("Temperature: %d\n", temperature);
+		printf("Humidity: %d\n", humidity);
+	  printf("Light: %d\n", light);
+		printf("Soil moisture: %d\n", soilMoisture);
+		printf(" LOCATION: %5.2f %c, %5.2f %c", latitude, lat, longitude, lon);
+
+		memcpy(tx_buffer, &latitude, sizeof(float));
+    memcpy(tx_buffer + 4, &longitude, sizeof(float));
+    memcpy(tx_buffer + 8, &temperature, sizeof(uint16_t));
+		memcpy(tx_buffer + 10, &humidity, sizeof(uint16_t));
+		memcpy(tx_buffer + 12, &light, sizeof(uint16_t));
+		memcpy(tx_buffer + 14, &soilMoisture, sizeof(uint16_t));
+		
+		for (int i = 0; i<15; i++) {
+			printf("%02x", tx_buffer[i]);
+		}
+		printf("\n");
+	  int packetLen = 2 * sizeof(float) + 4 * sizeof(uint16_t);
+    retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packetLen,
                            MSG_UNCONFIRMED_FLAG);
-		//retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packet_len,
-    //                       MSG_CONFIRMED_FLAG);
 
     if (retcode < 0) {
         retcode == LORAWAN_STATUS_WOULD_BLOCK ? printf("send - WOULD BLOCK\r\n")
