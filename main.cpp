@@ -24,6 +24,7 @@
 #include "./SEN_13322.h"
 #include "./HW5P1_2015.h"
 #include "./RGBLED.h"
+#include "./TCS3472_I2C.h"	
 
 // Application helpers
 #include "DummySensor.h"
@@ -101,11 +102,7 @@ static uint8_t APP_KEY[] = { 0xf3,0x1c,0x2e,0x8b,0xc6,0x71,0x28,0x1d,0x51,0x16,0
 BufferedSerial* gps_Serial = new BufferedSerial(PA_9, PA_10,9600); 
 Thread gps_thread(osPriorityNormal, 2048);
 Adafruit_GPS myGPS(gps_Serial); 
-Si7021 tempHumSensor(PB_9,PB_8);
-SEN_13322 soilMoistureSensor(PA_0);
-HW5P1_2015 lightSensor(PA_4);
-float latitude, longitude, lat, lon;
-RGBLED rgbLed(PH_0, PB_13, PH_1);
+float latitude, longitude;
 Mutex mutex;
 
 void readGps() {
@@ -124,7 +121,7 @@ void readGps() {
 			}
 			
 			mutex.lock();
-			latitude = myGPS.latitude / 100.0;
+		  latitude = myGPS.latitude / 100.0;
 			longitude = myGPS.longitude / 100.0;
 			if (myGPS.lat == 'S') {
 				latitude = -latitude;
@@ -209,8 +206,15 @@ int main(void)
  */
 static void send_message()
 {
+	  Si7021 tempHumSensor(PB_9,PB_8);
+		SEN_13322 soilMoistureSensor(PA_0);
+		HW5P1_2015 lightSensor(PA_4);
+		TCS3472_I2C rgbSensor(PB_9, PB_8);
+	  rgbSensor.enablePowerAndRGBC();
     uint16_t packet_len;
     int16_t retcode;
+	
+	  uint16_t rgbValues[4];
 		
 		tempHumSensor.measure();
 
@@ -223,7 +227,7 @@ static void send_message()
 		printf("Humidity: %d\n", humidity);
 	  printf("Light: %d\n", light);
 		printf("Soil moisture: %d\n", soilMoisture);
-		printf(" LOCATION: %5.2f %c, %5.2f %c", latitude, lat, longitude, lon);
+		printf(" LOCATION: %5.2f, %5.2f", latitude, longitude);
 
 		memcpy(tx_buffer, &latitude, sizeof(float));
     memcpy(tx_buffer + 4, &longitude, sizeof(float));
@@ -231,12 +235,15 @@ static void send_message()
 		memcpy(tx_buffer + 10, &humidity, sizeof(uint16_t));
 		memcpy(tx_buffer + 12, &light, sizeof(uint16_t));
 		memcpy(tx_buffer + 14, &soilMoisture, sizeof(uint16_t));
+		memcpy(tx_buffer + 16, &rgbValues[1], sizeof(uint16_t));
+		memcpy(tx_buffer + 18, &rgbValues[2], sizeof(uint16_t));
+		memcpy(tx_buffer + 20, &rgbValues[3], sizeof(uint16_t));
 		
 		for (int i = 0; i<15; i++) {
 			printf("%02x", tx_buffer[i]);
 		}
 		printf("\n");
-	  int packetLen = 2 * sizeof(float) + 4 * sizeof(uint16_t);
+	  int packetLen = 2 * sizeof(float) + 7 * sizeof(uint16_t);
     retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packetLen,
                            MSG_UNCONFIRMED_FLAG);
 
@@ -262,6 +269,7 @@ static void send_message()
  */
 static void receive_message()
 {
+	  RGBLED rgbLed(PH_0, PB_13, PH_1);
     uint8_t port;
     int flags;
     int16_t retcode = lorawan.receive(rx_buffer, sizeof(rx_buffer), port, flags);

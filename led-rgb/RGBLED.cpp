@@ -2,7 +2,8 @@
 #include "mbed.h"
 
 RGBLED::RGBLED(DigitalOut redPin, DigitalOut greenPin, DigitalOut bluePin) : redPin(redPin), greenPin(greenPin), bluePin(bluePin) {};
-
+RGBLED::~RGBLED() {
+}
 void RGBLED::setColor(uint8_t red, uint8_t green, uint8_t blue) {
 	redPin = red;
 	greenPin = green;
