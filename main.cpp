@@ -25,6 +25,7 @@
 #include "./HW5P1_2015.h"
 #include "./RGBLED.h"
 #include "./TCS3472_I2C.h"	
+#include "./MMA8451Q.h"
 
 // Application helpers
 #include "DummySensor.h"
@@ -102,6 +103,8 @@ static uint8_t APP_KEY[] = { 0xf3,0x1c,0x2e,0x8b,0xc6,0x71,0x28,0x1d,0x51,0x16,0
 BufferedSerial* gps_Serial = new BufferedSerial(PA_9, PA_10,9600); 
 Thread gps_thread(osPriorityNormal, 2048);
 Adafruit_GPS myGPS(gps_Serial); 
+TCS3472_I2C rgbSensor(PB_9, PB_8);
+
 float latitude, longitude;
 Mutex mutex;
 
@@ -142,12 +145,14 @@ void readGps() {
 int main(void)
 {
 		gps_thread.start(readGps);
+		
+		rgbSensor.enablePowerAndRGBC();
     // setup tracing
     setup_trace();
 
     // stores the status of a call to LoRaWAN protocol
     lorawan_status_t retcode;
-
+		
     // Initialize LoRaWAN stack
     if (lorawan.initialize(&ev_queue) != LORAWAN_STATUS_OK) {
         printf("\r\n LoRa initialization failed! \r\n");
@@ -209,15 +214,18 @@ static void send_message()
 	  Si7021 tempHumSensor(PB_9,PB_8);
 		SEN_13322 soilMoistureSensor(PA_0);
 		HW5P1_2015 lightSensor(PA_4);
-		TCS3472_I2C rgbSensor(PB_9, PB_8);
-	  rgbSensor.enablePowerAndRGBC();
+    MMA8451Q acc(PB_9,PB_8,0x1d<<1);
+	
+	  float accValues[3];
     uint16_t packet_len;
     int16_t retcode;
-	
-	  uint16_t rgbValues[4];
+		uint16_t rgbValues[4];
+    
 		
 		tempHumSensor.measure();
-
+		rgbSensor.getAllColors(rgbValues);
+		acc.getAllAxis(accValues);
+	
 		uint16_t temperature = (uint16_t)tempHumSensor.get_temperature();
 		uint16_t humidity = (uint16_t)tempHumSensor.get_humidity();
 	  uint16_t light = (uint16_t)lightSensor.readLight();
@@ -227,7 +235,12 @@ static void send_message()
 		printf("Humidity: %d\n", humidity);
 	  printf("Light: %d\n", light);
 		printf("Soil moisture: %d\n", soilMoisture);
-		printf(" LOCATION: %5.2f, %5.2f", latitude, longitude);
+	  printf("RED: %d\n", rgbValues[1]);
+		printf("GREEN: %d\n", rgbValues[2]);
+		printf("BLUE: %d\n", rgbValues[3]);
+		printf("ACC Z AXIS: %3.2f\n", accValues[2]);
+		printf("ACC Y AXIS: %3.2f\n", accValues[1]);
+		printf("LOCATION: %5.2f, %5.2f", latitude, longitude);
 
 		memcpy(tx_buffer, &latitude, sizeof(float));
     memcpy(tx_buffer + 4, &longitude, sizeof(float));
@@ -238,12 +251,14 @@ static void send_message()
 		memcpy(tx_buffer + 16, &rgbValues[1], sizeof(uint16_t));
 		memcpy(tx_buffer + 18, &rgbValues[2], sizeof(uint16_t));
 		memcpy(tx_buffer + 20, &rgbValues[3], sizeof(uint16_t));
+		memcpy(tx_buffer + 22, &accValues[2], sizeof(float));
+		memcpy(tx_buffer + 26, &accValues[1], sizeof(float));
 		
-		for (int i = 0; i<15; i++) {
+		for (int i = 0; i<30; i++) {
 			printf("%02x", tx_buffer[i]);
 		}
 		printf("\n");
-	  int packetLen = 2 * sizeof(float) + 7 * sizeof(uint16_t);
+	  int packetLen = 4 * sizeof(float) + 7 * sizeof(uint16_t);
     retcode = lorawan.send(MBED_CONF_LORA_APP_PORT, tx_buffer, packetLen,
                            MSG_UNCONFIRMED_FLAG);
 
