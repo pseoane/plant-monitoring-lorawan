@@ -384,11 +384,6 @@
           <GroupName>ssnnlorawan</GroupName>
           <Files>
             <File>
-              <FileName>DummySensor.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>./DummySensor.h</FilePath>
-            </File>
-            <File>
               <FileName>lora_radio_helper.h</FileName>
               <FileType>5</FileType>
               <FilePath>./lora_radio_helper.h</FilePath>

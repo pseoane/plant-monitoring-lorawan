@@ -28,7 +28,6 @@
 #include "./MMA8451Q.h"
 
 // Application helpers
-#include "DummySensor.h"
 #include "trace_helper.h"
 #include "lora_radio_helper.h"
 
